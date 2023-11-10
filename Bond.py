@@ -125,7 +125,7 @@ class Bond:
                         , diffDay1
                         , diffDay1/self.cashFlow.loc[idx,'CF_Period']
                         , self.cashFlow.loc[idx, 'CF_E_Amount']
-                        , self.cashFlow.loc[idx,'CF_E_Amount']*(diffDay1 / self.cashFlow.loc[idx,'CF_Period'])
+                        , 0
                     ])
 
                     # 매입일~CF계산 종료일 구간 현금흐름 수정
@@ -147,6 +147,8 @@ class Bond:
                 
             self.cashFlow.sort_values(by='CF_StartDate', ignore_index=True, inplace=True)
 
+
+
     # 내부수익률 Internal Rate of Return 계산
     # 장부가==sum(발생CF/(1+i)^n) ?  i 확정 : i 수정
     def calcIRR(self):
@@ -155,25 +157,23 @@ class Bond:
         correctionR = 0.5  # 수정치
         flag = 1          
 
+        # 실제 현금흐름이 존재하는 건에 대하여 내부수익률 계산
+        tmpCashFlow = self.cashFlow[self.cashFlow['CF_R_Amount'] > 0].reset_index(drop=True)
         for _ in range(REPEAT):
             tmpAmt = 0
 
-            # 미래에 예정되어있는 현금흐름을
-            # 채권 매입일자로 할인
-            size = len(self.cashFlow)
+            # 미래에 예정되어있는 현금흐름을 채권 매입일자로 할인
+            size = len(tmpCashFlow)
             for i in range(size):
-                if self.cashFlow['CF_R_Amount'][i] == 0: # 현금흐름이 있는 경우만 고려
-                    continue
-
-                eAmount = self.cashFlow['CF_E_Amount'][i]
+                rAmount=tmpCashFlow['CF_R_Amount'][i]
 
                 if i == size-1 : # 마지막 현금흐름에 액면가를 더함
-                    eAmount+=self.faceValue
+                    rAmount+=self.faceValue
 
-                tmpAmt+=eAmount/power(1+tmpRate,sum(self.cashFlow['Weighted_R'][:i+1]))
+                tmpAmt+=rAmount/power(1+tmpRate,sum(tmpCashFlow['Weighted_R'][:i+1]))
 
             # 장부가격(매입가격) 과 비교
-            if abs(tmpAmt-self.bookValue) < 0.001 : # 그 차이가 근소할 때
+            if abs(tmpAmt-self.bookValue) < 0.001 : # 그 차이가 근소할 때 내부수익률 확정
                 break
 
 
@@ -182,16 +182,23 @@ class Bond:
             if flag == 1:
                 # 계산한 금액이 장부가격 보다 큰 경우
                 if (tmpAmt - self.bookValue) > 0 :
-                    flag = -1    
-                    correctionR*=-0.5 # 수정치 재계산
+                    flag = -1
+                    correctionR*=0.5
+
+                    tmpRate+=correctionR
+                else:
+                    tmpRate-=correctionR
 
             else:
                 # 계산한 금액이 장부가격보다 작은 경우    
                 if (tmpAmt - self.bookValue) < 0 :
                     flag = 1
-                    correctionR*=-0.5
+                    correctionR*=0.5
+
+                    tmpRate-=correctionR
+                else:
+                    tmpRate+=correctionR
                 
-            tmpRate+=correctionR # 내부수익률 수정
 
         # 내부수익률 확정
         self.IRR = tmpRate*(12/self.iPaymentPeriod)
@@ -217,6 +224,7 @@ if __name__=="__main__" :
 
 
     # CASE 1 발행일과 매입일이 일치하는 경우
+    '''
     bookValue = 9_000_000_000 # 장부가
     dateOfPurchase = '20190101' # 매입일
     bd.purchase(bookValue, dateOfPurchase) # 채권 매입
@@ -226,7 +234,7 @@ if __name__=="__main__" :
     print('\nInternal Rate of Return')
     print(bd.IRR)
     print()
-
+    '''
 
     # CASE 2  발행일과 매입일이 일치하지 않는 경우
     bookValue = 9_000_000_000 # 장부가
