@@ -162,6 +162,9 @@ class Bond:
             # 채권 매입일자로 할인
             size = len(self.cashFlow)
             for i in range(size):
+                if self.cashFlow['CF_R_Amount'][i] == 0: # 현금흐름이 있는 경우만 고려
+                    continue
+
                 eAmount = self.cashFlow['CF_E_Amount'][i]
 
                 if i == size-1 : # 마지막 현금흐름에 액면가를 더함
@@ -191,7 +194,7 @@ class Bond:
             tmpRate+=correctionR # 내부수익률 수정
 
         # 내부수익률 확정
-        self.IRR = tmpRate*self.iPaymentPeriod
+        self.IRR = tmpRate*(12/self.iPaymentPeriod)
 
 
 
